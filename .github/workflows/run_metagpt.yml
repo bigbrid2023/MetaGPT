@@ -1,10 +1,10 @@
 name: MetaGPT_Cloud_Task
 
 on:
-  workflow_dispatch: # 允许你手动点击按钮并输入任务
+  workflow_dispatch:
     inputs:
       idea:
-        description: '你的任务需求 (例如: 写一个中奖号码脚本)'
+        description: '你的任务需求'
         required: true
         default: '写一个简单的 Python 脚本，随机生成 10 个中奖号码'
 
@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # 升级到 v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # 升级到 v5
         with:
           python-version: '3.9'
 
@@ -24,24 +24,21 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e .
-          pip install loguru pydantic-settings python-docx  # 补齐核心依赖
+          pip install loguru pydantic-settings python-docx
 
       - name: Run MetaGPT with Gemini
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # 动态生成配置文件，无需手动上传 config2.yaml
           mkdir -p ~/.metagpt
           echo "llm:" > ~/.metagpt/config2.yaml
           echo "  api_type: 'gemini'" >> ~/.metagpt/config2.yaml
           echo "  api_key: '$GEMINI_API_KEY'" >> ~/.metagpt/config2.yaml
           echo "  model: 'gemini-1.5-flash'" >> ~/.metagpt/config2.yaml
-          
-          # 启动任务
           python3 -m metagpt.startup "${{ github.event.inputs.idea }}"
 
       - name: Upload Workspace Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4 # 核心修正：必须使用 v4
         with:
           name: ai_generated_code
-          path: workspace/ # 将生成的所有代码和文档打包
+          path: workspace/
