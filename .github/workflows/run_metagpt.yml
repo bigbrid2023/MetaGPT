@@ -13,32 +13,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4 # 升级到 v4
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # 升级到 v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      - name: Install MetaGPT
+      - name: Install Dependencies
         run: |
           pip install --upgrade pip
           pip install -e .
+          # 显式安装核心组件，确保 Linux 环境兼容性
           pip install loguru pydantic-settings python-docx
 
       - name: Run MetaGPT with Gemini
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PYTHONPATH: . # 必须显式指定当前路径
         run: |
-          mkdir -p ~/.metagpt
-          echo "llm:" > ~/.metagpt/config2.yaml
-          echo "  api_type: 'gemini'" >> ~/.metagpt/config2.yaml
-          echo "  api_key: '$GEMINI_API_KEY'" >> ~/.metagpt/config2.yaml
-          echo "  model: 'gemini-1.5-flash'" >> ~/.metagpt/config2.yaml
-          python3 -m metagpt.startup "${{ github.event.inputs.idea }}"
+          # 1. 在当前目录下创建临时配置文件
+          mkdir -p config
+          cat > config/config2.yaml <<EOF
+          llm:
+            api_type: "gemini"
+            api_key: "$GEMINI_API_KEY"
+            model: "gemini-1.5-flash"
+          EOF
+          
+          # 2. 运行 MetaGPT 并强制将日志输出到控制台以便排查
+          python3 -m metagpt.startup "${{ github.event.inputs.idea }}" --log-level INFO
 
       - name: Upload Workspace Results
-        uses: actions/upload-artifact@v4 # 核心修正：必须使用 v4
+        if: always() # 即使失败也尝试上传，方便看报错日志
+        uses: actions/upload-artifact@v4
         with:
           name: ai_generated_code
-          path: workspace/
+          path: workspace/ # 确认该路径在 MetaGPT 运行后会自动生成
