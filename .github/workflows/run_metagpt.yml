@@ -20,37 +20,34 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install MetaGPT & Dependencies
+      - name: Install Dependencies
         run: |
           pip install --upgrade pip
-          # 安装当前目录下的 MetaGPT 及其依赖
-          pip install -e . 
-          # 显式补全 Linux 容器可能缺失的库
+          # 绕过本地安装，直接安装 requirements 里的所有零件
+          pip install -r requirements.txt
           pip install loguru pydantic-settings python-docx
 
-      - name: Debug & Run MetaGPT
+      - name: Run MetaGPT directly
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          PYTHONPATH: .
+          PYTHONPATH: ${{ github.workspace }} # 强制锁定项目根目录
         run: |
-          # 1. 检查 API Key 是否已正确注入 (不打印完整 Key 以保安全)
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "错误: 未找到 GEMINI_API_KEY，请检查 GitHub Secrets 配置"
-            exit 1
-          fi
-          
-          # 2. 强制创建 config 目录并写入配置
+          # 1. 强制生成配置文件
           mkdir -p config
-          printf "llm:\n  api_type: 'gemini'\n  api_key: '$GEMINI_API_KEY'\n  model: 'gemini-1.5-flash'\n" > config/config2.yaml
+          cat > config/config2.yaml <<EOF
+          llm:
+            api_type: "gemini"
+            api_key: "$GEMINI_API_KEY"
+            model: "gemini-1.5-flash"
+          EOF
           
-          # 3. 运行并捕获详细日志
-          echo "正在启动 MetaGPT 任务..."
-          python3 -m metagpt.startup "${{ github.event.inputs.idea }}" --log-level DEBUG
+          # 2. 直接运行本地的 startup.py 脚本，避开模块识别问题
+          echo "正在点火 AI 团队..."
+          python3 metagpt/startup.py "${{ github.event.inputs.idea }}" --log-level INFO
 
       - name: Upload Workspace Results
-        if: always() # 无论成功失败都执行，方便排查
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ai_generated_code
           path: workspace/
-          if-no-files-found: warn
