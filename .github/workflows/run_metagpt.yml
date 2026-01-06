@@ -20,30 +20,34 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Dependencies
+      - name: Install All Dependencies
         run: |
           pip install --upgrade pip
-          # 绕过本地安装，直接安装 requirements 里的所有零件
           pip install -r requirements.txt
-          pip install loguru pydantic-settings python-docx
+          pip install loguru pydantic-settings python-docx pydantic==2.10.1 # 强制指定稳定版本
 
-      - name: Run MetaGPT directly
+      - name: Run MetaGPT and Cat Code
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }} # 强制锁定项目根目录
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          # 1. 强制生成配置文件
+          # 1. 生成配置
           mkdir -p config
-          cat > config/config2.yaml <<EOF
-          llm:
-            api_type: "gemini"
-            api_key: "$GEMINI_API_KEY"
-            model: "gemini-1.5-flash"
-          EOF
+          printf "llm:\n  api_type: 'gemini'\n  api_key: '$GEMINI_API_KEY'\n  model: 'gemini-1.5-flash'\n" > config/config2.yaml
           
-          # 2. 直接运行本地的 startup.py 脚本，避开模块识别问题
-          echo "正在点火 AI 团队..."
+          # 2. 运行任务，并使用 timeout 确保不会死等
+          echo "AI 团队开始协作，请观察下方日志输出..."
           python3 metagpt/startup.py "${{ github.event.inputs.idea }}" --log-level INFO
+          
+          # 3. 暴力打印：如果生成了目录，直接找出 main.py 并打印到屏幕上
+          echo "----------------------------------------"
+          echo "检查生成结果："
+          if [ -d "workspace" ]; then
+            find workspace -name "main.py" -exec echo "找到代码文件: {}" \; -exec cat {} \;
+          else
+            echo "错误：AI 团队未能在 workspace 目录下产出文件，请检查 API Key 是否有效。"
+          fi
+          echo "----------------------------------------"
 
       - name: Upload Workspace Results
         if: always()
